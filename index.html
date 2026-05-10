@@ -17,8 +17,8 @@
       pointer-events: none;
     }
     .frame {
-      width: 75vw;
-      height: 35vw;
+      width: 80vw;
+      height: 40vw;
       position: relative;
     }
     .frame::before, .frame::after,
@@ -37,7 +37,7 @@
       position: absolute;
       left: 2px; right: 2px; height: 3px;
       background: linear-gradient(90deg, transparent, #22c55e, transparent);
-      animation: scan 2s linear infinite;
+      animation: scan 1.5s linear infinite;
     }
     @keyframes scan {
       0%   { top: 4px; }
@@ -48,22 +48,24 @@
       color: white;
       font-size: 4.5vw;
       font-weight: 700;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.7);
       padding: 3vw 6vw;
       border-radius: 30px;
       text-align: center;
+      pointer-events: none;
     }
     .btn-close {
       position: fixed;
       top: 5vw; right: 5vw;
-      background: rgba(255,255,255,0.2);
-      border: none;
+      background: rgba(0,0,0,0.6);
+      border: 2px solid white;
       border-radius: 50%;
       width: 12vw; height: 12vw;
       font-size: 6vw;
       color: white;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
+      z-index: 10;
     }
     .success {
       position: fixed;
@@ -76,8 +78,18 @@
       text-align: center;
       transform: translateY(100%);
       transition: transform 0.3s;
+      z-index: 10;
     }
     .success.show { transform: translateY(0); }
+    .attempts {
+      position: fixed;
+      top: 5vw; left: 5vw;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      padding: 2vw 4vw;
+      border-radius: 20px;
+      font-size: 3.5vw;
+    }
   </style>
 </head>
 <body>
@@ -90,10 +102,11 @@
     <div class="corner-br"></div>
     <div class="corner-bl"></div>
   </div>
-  <div class="hint">Centrez le code-barres dans le cadre</div>
+  <div class="hint" id="hint">Centrez le code-barres dans le cadre</div>
 </div>
 
 <button class="btn-close" onclick="fermer()">✕</button>
+<div class="attempts" id="attempts"></div>
 <div class="success" id="success">✅ Code détecté !</div>
 
 <script src="https://unpkg.com/@zxing/library@0.18.6/umd/index.min.js"></script>
@@ -104,16 +117,35 @@ let detected = false;
 
 const APP_URL = 'https://script.google.com/macros/s/AKfycbxIOp2zVIH_FgXdXbnb24Coea2peU89G9FHkS6Wslik-C6RMlyDzKQAqWFoo_oYB10Z/exec';
 
+const hints = new Map();
+hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+  ZXing.BarcodeFormat.EAN_13,
+  ZXing.BarcodeFormat.EAN_8,
+  ZXing.BarcodeFormat.UPC_A,
+  ZXing.BarcodeFormat.UPC_E,
+  ZXing.BarcodeFormat.CODE_128,
+  ZXing.BarcodeFormat.CODE_39,
+  ZXing.BarcodeFormat.ITF,
+  ZXing.BarcodeFormat.RSS_14
+]);
+
 async function init() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: 'continuous'
+      }
     });
+
     const video = document.getElementById('video');
     video.srcObject = stream;
     await video.play();
 
-    codeReader = new ZXing.BrowserMultiFormatReader();
+    codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);
     codeReader.decodeFromStream(stream, video, (result, err) => {
       if (result && !detected) {
         detected = true;
@@ -127,10 +159,12 @@ async function init() {
         }, 800);
       }
     });
+
   } catch(err) {
-    document.querySelector('.hint').textContent = err.name === 'NotAllowedError'
-      ? '⚠️ Autorisez la caméra dans Safari'
-      : '❌ Caméra non disponible';
+    document.getElementById('hint').textContent =
+      err.name === 'NotAllowedError'
+        ? '⚠️ Autorisez la caméra dans Safari'
+        : '❌ Caméra non disponible : ' + err.message;
   }
 }
 
